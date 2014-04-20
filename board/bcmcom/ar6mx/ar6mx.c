@@ -62,6 +62,18 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 
 };
 
+static iomux_v3_cfg_t const gpio_pads[] = {
+	MX6_PAD_NANDF_D0__GPIO2_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D1__GPIO2_IO01 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D2__GPIO2_IO02 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D3__GPIO2_IO03 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D4__GPIO2_IO04 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D5__GPIO2_IO05 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D6__GPIO2_IO06 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NANDF_D7__GPIO2_IO07 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
+
 int dram_init(void)
 {
 	gd->ram_size = (phys_size_t)CONFIG_DDR_MB * 1024 * 1024;
@@ -121,7 +133,6 @@ static iomux_v3_cfg_t const enet_pads1[] = {
 
 	MX6_PAD_ENET_CRS_DV__GPIO1_IO25  | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
-
 
 int mx6_rgmii_rework(struct phy_device *phydev)
 {
@@ -194,6 +205,19 @@ int board_phy_config(struct phy_device *phydev)
 	return 0;
 }
 
+static void setup_gpios(void)
+{
+	int i;
+
+	imx_iomux_v3_setup_multiple_pads(gpio_pads, ARRAY_SIZE(gpio_pads));
+
+	for (i=0; i< 6;i++) {
+		gpio_direction_input(IMX_GPIO_NR(2, i));
+	};
+	gpio_direction_output(IMX_GPIO_NR(2, 6), 0);
+	gpio_direction_output(IMX_GPIO_NR(2, 7), 0);
+};
+
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
@@ -218,6 +242,8 @@ int board_init(void)
 #ifdef CONFIG_CMD_SATA
 	setup_sata();
 #endif
+
+	setup_gpios();
 
 	return 0;
 }
