@@ -46,6 +46,11 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define USDHC3_CD_GPIO IMX_GPIO_NR(7, 0)
 
+iomux_v3_cfg_t const uart1_pads[] = {
+	MX6_PAD_SD3_DAT7__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_SD3_DAT6__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
 iomux_v3_cfg_t const uart4_pads[] = {
 	MX6_PAD_KEY_COL0__UART4_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
 	MX6_PAD_KEY_ROW0__UART4_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -82,6 +87,7 @@ int dram_init(void)
 
 static void setup_iomux_uart(void)
 {
+	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 	imx_iomux_v3_setup_multiple_pads(uart4_pads, ARRAY_SIZE(uart4_pads));
 }
 

@@ -31,7 +31,7 @@
 #define CONFIG_MXC_GPIO
 
 #define CONFIG_MXC_UART
-#define CONFIG_MXC_UART_BASE		UART4_BASE
+#define CONFIG_MXC_UART_BASE		UART1_BASE
 
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
@@ -99,7 +99,7 @@
 #define	CONFIG_EXTRA_ENV_SETTINGS \
 	"autoload=no\0" \
 	"loadaddr=0x10800000\0" \
-	"console=ttymxc3,115200\0" \
+	"console=ttymxc0,115200\0" \
 	"kernel=/boot/uImage\0" \
 	"bootscr=boot.scr\0" \
 	"video_hdmi=mxcfb0:dev=hdmi,1280x720M@60,if=RGB24,bpp=32\0" \
