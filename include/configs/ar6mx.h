@@ -12,7 +12,9 @@
 
 #include <asm/arch/imx-regs.h>
 #include <asm/imx-common/gpio.h>
-#include <asm/sizes.h>
+
+#include "mx6_common.h"
+#include <linux/sizes.h>
 
 #define CONFIG_MX6
 #define CONFIG_DISPLAY_CPUINFO
@@ -185,6 +187,11 @@
 
 #ifndef CONFIG_SYS_DCACHE_OFF
 #define CONFIG_CMD_CACHE
+#endif
+
+
+#if defined(CONFIG_ANDROID_SUPPORT)
+#include "ar6mxandroid_common.h"
 #endif
 
 #endif /* __CONFIG_H * */
