@@ -5,7 +5,7 @@
  * Support for BCM AR6MX Board
  *
  * SPDX-License-Identifier:	GPL-2.0+
- * 
+ *
  */
 
 #include <asm/arch/clock.h>
@@ -27,6 +27,10 @@
 #include <miiphy.h>
 #include <netdev.h>
 
+#define MACH_TYPE_AR6MX	4517
+#define USB_OTG_PWR IMX_GPIO_NR(1, 7)
+#define USB_V1_POWER IMX_GPIO_NR(5, 13)
+#define USB_V2_POWER IMX_GPIO_NR(5, 14)
 DECLARE_GLOBAL_DATA_PTR;
 
 #define UART_PAD_CTRL (PAD_CTL_PUS_100K_UP | \
@@ -262,7 +266,7 @@ static const struct boot_mode board_boot_modes[] = {
 };
 #endif
 
- 
+
 int board_late_init(void)
 {
 #ifdef CONFIG_CMD_BMODE
@@ -277,3 +281,151 @@ int checkboard(void)
 	puts("Board: BCM AR6MX\n");
 	return 0;
 }
+
+void ldo_mode_set(int ldo_bypass)
+{
+
+}
+
+#ifdef CONFIG_FASTBOOT
+
+void board_fastboot_setup(void)
+{
+	switch (get_boot_device()) {
+#if defined(CONFIG_FASTBOOT_STORAGE_SATA)
+	case SATA_BOOT:
+		if (!getenv("fastboot_dev"))
+			setenv("fastboot_dev", "sata");
+		if (!getenv("bootcmd"))
+			setenv("bootcmd", "booti sata");
+		break;
+#endif /*CONFIG_FASTBOOT_STORAGE_SATA*/
+#if defined(CONFIG_FASTBOOT_STORAGE_MMC)
+	case SD2_BOOT:
+	case MMC2_BOOT:
+	    if (!getenv("fastboot_dev"))
+			setenv("fastboot_dev", "mmc0");
+	    if (!getenv("bootcmd"))
+			setenv("bootcmd", "booti mmc0");
+	    break;
+	case SD3_BOOT:
+	case MMC3_BOOT:
+	    if (!getenv("fastboot_dev"))
+			setenv("fastboot_dev", "mmc0");
+	    if (!getenv("bootcmd")) {
+				if(detect_hdmi(&displays[1]))
+					setenv("bootcmd", "run bootargs_hdmi;booti mmc0");
+				else
+					setenv("bootcmd", "run bootargs_ldb;booti mmc0");
+			}
+	    break;
+	case MMC4_BOOT:
+	    if (!getenv("fastboot_dev"))
+			setenv("fastboot_dev", "mmc1");
+	    if (!getenv("bootcmd"))
+			setenv("bootcmd", "booti mmc1");
+	    break;
+#endif /*CONFIG_FASTBOOT_STORAGE_MMC*/
+	default:
+		printf("unsupported boot devices\n");
+		break;
+	}
+
+}
+
+#ifdef CONFIG_ANDROID_RECOVERY
+
+#define GPIO_VOL_DN_KEY IMX_GPIO_NR(1, 5)
+iomux_v3_cfg_t const recovery_key_pads[] = {
+	(MX6_PAD_GPIO_5__GPIO1_IO05 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+};
+
+int check_recovery_cmd_file(void)
+{
+    int button_pressed = 0;
+    int recovery_mode = 0;
+
+    recovery_mode = recovery_check_and_clean_flag();
+
+    /* Check Recovery Combo Button press or not. */
+	imx_iomux_v3_setup_multiple_pads(recovery_key_pads,
+			ARRAY_SIZE(recovery_key_pads));
+
+    gpio_direction_input(GPIO_VOL_DN_KEY);
+
+    if (gpio_get_value(GPIO_VOL_DN_KEY) == 0) { /* VOL_DN key is low assert */
+		button_pressed = 1;
+		printf("Recovery key pressed\n");
+    }
+
+    return recovery_mode || button_pressed;
+}
+
+void board_recovery_setup(void)
+{
+	int bootdev = get_boot_device();
+
+	switch (bootdev) {
+#if defined(CONFIG_FASTBOOT_STORAGE_SATA)
+	case SATA_BOOT:
+		if (!getenv("bootcmd_android_recovery"))
+			setenv("bootcmd_android_recovery",
+				"booti sata recovery");
+		break;
+#endif /*CONFIG_FASTBOOT_STORAGE_SATA*/
+#if defined(CONFIG_FASTBOOT_STORAGE_MMC)
+	case SD2_BOOT:
+	case MMC2_BOOT:
+		if (!getenv("bootcmd_android_recovery"))
+			setenv("bootcmd_android_recovery",
+				"booti mmc0 recovery");
+		break;
+	case SD3_BOOT:
+	case MMC3_BOOT:
+		if (!getenv("bootcmd_android_recovery"))
+			setenv("bootcmd_android_recovery",
+				"booti mmc1 recovery");
+		break;
+	case MMC4_BOOT:
+		if (!getenv("bootcmd_android_recovery"))
+			setenv("bootcmd_android_recovery",
+				"booti mmc2 recovery");
+		break;
+#endif /*CONFIG_FASTBOOT_STORAGE_MMC*/
+	default:
+		printf("Unsupported bootup device for recovery: dev: %d\n",
+			bootdev);
+		return;
+	}
+
+	printf("setup env for recovery..\n");
+	setenv("bootcmd", "run bootcmd_android_recovery");
+}
+
+#endif /*CONFIG_ANDROID_RECOVERY*/
+
+#endif /*CONFIG_FASTBOOT*/
+
+#ifdef CONFIG_IMX_UDC
+iomux_v3_cfg_t const otg_udc_pads[] = {
+	(MX6_PAD_GPIO_1__USB_OTG_ID | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	(MX6_PAD_GPIO_7__GPIO1_IO07 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	(MX6_PAD_DISP0_DAT19__GPIO5_IO13 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	(MX6_PAD_DISP0_DAT20__GPIO5_IO14 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+};
+void udc_pins_setting(void)
+{
+	imx_iomux_v3_setup_multiple_pads(otg_udc_pads,
+			ARRAY_SIZE(otg_udc_pads));
+	/* USB_OTG_PWR = 0 */
+	gpio_direction_output(USB_OTG_PWR, 0);
+	/* USB_V1_POWER = 1 */
+	gpio_direction_output(USB_V1_POWER, 1);
+	/* USB_V1_POWER = 1 */
+	gpio_direction_output(USB_V1_POWER, 1);
+
+	mxc_iomux_set_gpr_register(1, 13, 1, 1);
+
+}
+#endif
+
