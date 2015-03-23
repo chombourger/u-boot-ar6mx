@@ -31,6 +31,10 @@
 #define USB_OTG_PWR IMX_GPIO_NR(1, 7)
 #define USB_V1_POWER IMX_GPIO_NR(5, 13)
 #define USB_V2_POWER IMX_GPIO_NR(5, 14)
+
+#define AR6MX_ENET_RST  IMX_GPIO_NR(1, 25)
+#define AR6MX_CLK125_EN IMX_GPIO_NR(6, 24)
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #define UART_PAD_CTRL (PAD_CTL_PUS_100K_UP | \
@@ -136,7 +140,6 @@ static iomux_v3_cfg_t const enet_pads1[] = {
 	MX6_PAD_RGMII_RD1__RGMII_RD1 | MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_RD2__RGMII_RD2 | MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_RD3__RGMII_RD3 | MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RX_CTL__RGMII_RX_CTL | MUX_PAD_CTRL(ENET_PAD_CTRL),
 
 	/* CLK125_EN 125Mhz clockout enabled */
 	MX6_PAD_RGMII_RX_CTL__GPIO6_IO24 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -144,10 +147,14 @@ static iomux_v3_cfg_t const enet_pads1[] = {
 	MX6_PAD_ENET_CRS_DV__GPIO1_IO25  | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
+static iomux_v3_cfg_t const enet_pads2[] = {
+	MX6_PAD_RGMII_RX_CTL__RGMII_RX_CTL | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
 int mx6_rgmii_rework(struct phy_device *phydev)
 {
 
-	/* RX Data Pad Skew Register */ 
+	/* RX Data Pad Skew Register */
 	ksz9031_phy_extended_write(phydev, 0x02,MII_KSZ9031_EXT_RGMII_RX_DATA_SKEW,
 		MII_KSZ9031_MOD_DATA_NO_POST_INC,0x7777);
 	/* TX Data Pad Skew Register */
@@ -162,15 +169,17 @@ int mx6_rgmii_rework(struct phy_device *phydev)
 
 static void setup_iomux_enet(void)
 {
-	unsigned int reg;
-
 	imx_iomux_v3_setup_multiple_pads(enet_pads1, ARRAY_SIZE(enet_pads1));
 
-	/* Perform a reset, the phy address is preconfigured on the board */
-	gpio_direction_output(IMX_GPIO_NR(1, 25), 0); 
-	udelay(1000);
-	gpio_direction_output(IMX_GPIO_NR(1, 25), 1); 
-	
+	/* phy reset: gpio1-25 */
+	gpio_direction_output(AR6MX_ENET_RST, 0);
+  /* Straping CLK125_EN */
+	gpio_direction_output(AR6MX_CLK125_EN, 1);
+	mdelay(50);
+
+	gpio_direction_output(AR6MX_ENET_RST, 1);
+
+	imx_iomux_v3_setup_multiple_pads(enet_pads2, ARRAY_SIZE(enet_pads2));
 };
 
 
@@ -189,7 +198,7 @@ int board_eth_init(bd_t *bis)
 		return 0;
 
 	/** phy address can only range from 1-7 **/
-	phydev = phy_find_by_mask(bus, 0x07 << CONFIG_FEC_MXC_PHYADDR, 
+	phydev = phy_find_by_mask(bus, 0x07 << CONFIG_FEC_MXC_PHYADDR,
 		PHY_INTERFACE_MODE_RGMII);
 	if (!phydev) {
 		free(bus);
