@@ -97,10 +97,22 @@
 
 #define CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE
 
+#define CONFIG_MFG_ENV_SETTINGS \
+	"mfgtool_args=setenv bootargs console=ttymxc0,115200 " \
+		"rdinit=/linuxrc " \
+		"g_mass_storage.stall=0 g_mass_storage.removable=1 " \
+		"g_mass_storage.idVendor=0x066F g_mass_storage.idProduct=0x37FF "\
+		"g_mass_storage.iSerialNumber=\"\" "\
+		"enable_wait_mode=off\0"\
+		"initrd_addr=0x12C00000\0" \
+		"initrd_high=0xffffffff\0" \
+		"bootcmd_mfg=run mfgtool_args;bootm ${loadaddr} ${initrd_addr} ${fdt_addr};\0" \
 
 #define	CONFIG_EXTRA_ENV_SETTINGS \
+	CONFIG_MFG_ENV_SETTINGS \
 	"autoload=no\0" \
 	"loadaddr=0x10800000\0" \
+	"fdt_addr=0x18000000\0" \
 	"console=ttymxc0,115200\0" \
 	"kernel=/boot/uImage\0" \
 	"bootscr=boot.scr\0" \
