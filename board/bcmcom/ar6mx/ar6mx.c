@@ -78,6 +78,19 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 
 };
 
+iomux_v3_cfg_t const usdhc4_pads[] = {
+	MX6_PAD_SD4_CLK__SD4_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_CMD__SD4_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT0__SD4_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT1__SD4_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT2__SD4_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT3__SD4_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT4__SD4_DATA4 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT5__SD4_DATA5 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT6__SD4_DATA6 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT7__SD4_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+};
+
 static iomux_v3_cfg_t const gpio_pads[] = {
 	MX6_PAD_NANDF_D0__GPIO2_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_NANDF_D1__GPIO2_IO01 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -102,7 +115,39 @@ static void setup_iomux_uart(void)
 	imx_iomux_v3_setup_multiple_pads(uart4_pads, ARRAY_SIZE(uart4_pads));
 }
 
-static struct fsl_esdhc_cfg usdhc_cfg = {USDHC3_BASE_ADDR};
+static struct fsl_esdhc_cfg usdhc_cfg[3] = {
+	{USDHC3_BASE_ADDR},
+	{USDHC4_BASE_ADDR},
+};
+
+int mmc_get_env_devno(void)
+{
+	u32 soc_sbmr = readl(SRC_BASE_ADDR + 0x4);
+	u32 dev_no;
+	u32 bootsel;
+
+	bootsel = (soc_sbmr & 0x000000FF) >> 6 ;
+
+	/* If not boot from sd/mmc, use default value */
+	if (bootsel != 1)
+		return CONFIG_SYS_MMC_ENV_DEV;
+
+	/* BOOT_CFG2[3] and BOOT_CFG2[4] */
+	dev_no = (soc_sbmr & 0x00001800) >> 11;
+
+	/* need ubstract 1 to map to the mmc device id
+	 * see the comments in board_mmc_init function
+	 */
+
+	dev_no--;
+
+	return dev_no;
+}
+
+int mmc_map_to_kernel_blk(int dev_no)
+{
+	return dev_no + 1;
+}
 
 int board_mmc_getcd(struct mmc *mmc)
 {
@@ -110,20 +155,52 @@ int board_mmc_getcd(struct mmc *mmc)
 	int ret = 0;
 
 	switch (cfg->esdhc_base) {
-		case USDHC3_BASE_ADDR:
-			ret = !gpio_get_value(USDHC3_CD_GPIO);
-			break;
+	case USDHC3_BASE_ADDR:
+		ret = !gpio_get_value(USDHC3_CD_GPIO);
+		break;
+	case USDHC4_BASE_ADDR:
+		ret = 1; /* eMMC/uSDHC4 is always present */
+		break;
 	}
+
 	return ret;
 }
 
 int board_mmc_init(bd_t *bis)
 {
-	imx_iomux_v3_setup_multiple_pads(usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
-	usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
-	usdhc_cfg.max_bus_width = 4;
+	s32 status = 0;
+	int i;
 
-	return fsl_esdhc_initialize(bis, &usdhc_cfg);
+	/*
+	 * According to the board_mmc_init() the following map is done:
+	 * (U-boot device node)    (Physical Port)
+	 * mmc0                    SD3
+	 * mmc1                    eMMC
+	 */
+	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
+		switch (i) {
+		case 0:
+			imx_iomux_v3_setup_multiple_pads(
+				usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+			gpio_direction_input(USDHC3_CD_GPIO);
+			usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
+			break;
+		case 1:
+			imx_iomux_v3_setup_multiple_pads(
+				usdhc4_pads, ARRAY_SIZE(usdhc4_pads));
+			usdhc_cfg[1].sdhc_clk = mxc_get_clock(MXC_ESDHC4_CLK);
+			break;
+		default:
+			printf("Warning: you configured more USDHC controllers"
+			       "(%d) then supported by the board (%d)\n",
+			       i + 1, CONFIG_SYS_FSL_USDHC_NUM);
+			return status;
+		}
+
+		status |= fsl_esdhc_initialize(bis, &usdhc_cfg[i]);
+	}
+
+	return status;
 }
 
 static iomux_v3_cfg_t const enet_pads1[] = {
@@ -522,8 +599,12 @@ void board_fastboot_setup(void)
 	case MMC4_BOOT:
 	    if (!getenv("fastboot_dev"))
 			setenv("fastboot_dev", "mmc1");
-	    if (!getenv("bootcmd"))
-			setenv("bootcmd", "booti mmc1");
+	    if (!getenv("bootcmd")) {
+				if(detect_hdmi(&displays[1]))
+					setenv("bootcmd", "run bootargs_hdmi;booti mmc1");
+				else
+					setenv("bootcmd", "run bootargs_ldb;booti mmc1");
+			}
 	    break;
 #endif /*CONFIG_FASTBOOT_STORAGE_MMC*/
 	default:
