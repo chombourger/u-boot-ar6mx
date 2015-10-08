@@ -455,7 +455,6 @@ static void gpr_init(void)
 
 void board_init_f(ulong dummy)
 {
-	gd = &gdata;
 	/*
 	 * We don't use DMA in SPL, but we do need it in U-Boot. U-Boot
 	 * initializes DMA very early (before all board code), so the only
@@ -474,6 +473,10 @@ void board_init_f(ulong dummy)
 
 	memset(__bss_start, 0, __bss_end - __bss_start);
 	board_init_r(NULL, 0);
+}
+
+void reset_cpu(ulong addr)
+{
 }
 
 #ifdef CONFIG_SPL_MMC_SUPPORT
