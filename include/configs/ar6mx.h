@@ -289,6 +289,10 @@
 #define CONFIG_INITRD_TAG
 #define CONFIG_REVISION_TAG
 
+/* Fuse support */
+#define CONFIG_MXC_OCOTP
+#define CONFIG_CMD_FUSE
+
 /* misc */
 #define CONFIG_BOARD_EARLY_INIT_F
 #define CONFIG_BOARD_LATE_INIT
