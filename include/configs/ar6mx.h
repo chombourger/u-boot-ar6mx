@@ -23,6 +23,9 @@
 #define CONFIG_DISPLAY_BOARDINFO
 #define CONFIG_TIMESTAMP
 
+/* Enable secure boot (HAB) */
+#define CONFIG_SECURE_BOOT
+
 /* CMD */
 #include <config_cmd_default.h>
 #define CONFIG_CMD_GREPENV
